@@ -2,16 +2,9 @@ import os.path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms import Resize, ToTensor, Compose, Normalize
-from torchvision.models import resnet34, ResNet34_Weights
-from tqdm.autonotebook import tqdm
+from torchvision.models import resnet34
 import argparse
 import numpy as np
-from sklearn.metrics import accuracy_score, confusion_matrix
-import shutil
-import matplotlib.pyplot as plt
 import cv2
 import warnings
 
