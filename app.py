@@ -11,84 +11,85 @@ import time
 import base64
 import io
 
-# Set page config with custom icon and wide layout
+# Cấu hình giao diện trang với biểu tượng tùy chỉnh và bố cục rộng
 st.set_page_config(
-    page_title="MangoLeaf AI | Disease Classifier",
+    page_title="MangoLeaf AI | Phân loại bệnh trên lá xoài",
     page_icon="🍃",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://example.com/help',
+        'Get Help': 'https://example.com/help',  # Bạn có thể thay đổi đường link nếu muốn
         'Report a bug': "https://example.com/bug",
-        'About': "# MangoLeaf AI - Advanced Disease Detection"
+        'About': "# MangoLeaf AI - Hệ thống phát hiện bệnh tiên tiến"
     }
 )
+
 
 # Disease information with emojis and more details
 DISEASE_INFO = {
     "Anthracnose": {
         "emoji": "🍄",
-        "description": "A fungal disease causing black spots and rotting.",
-        "symptoms": "Dark, sunken lesions on leaves, stems, flowers, and fruits.",
-        "treatment": "Apply fungicides containing copper or sulfur. Remove and destroy infected plant parts.",
-        "prevention": "Ensure proper spacing between trees for air circulation. Avoid overhead watering.",
-        "severity": "High"
+        "description": "Bệnh nấm gây ra các đốm đen và thối rữa.",
+        "symptoms": "Tổn thương sẫm màu, lõm xuống trên lá, thân, hoa và quả.",
+        "treatment": "Sử dụng thuốc diệt nấm chứa đồng hoặc lưu huỳnh. Loại bỏ và tiêu hủy các bộ phận cây bị nhiễm bệnh.",
+        "prevention": "Đảm bảo khoảng cách thích hợp giữa các cây để lưu thông không khí. Tránh tưới nước từ trên cao.",
+        "severity": "Cao"
     },
     "Bacterial Canker": {
         "emoji": "🦠",
-        "description": "Bacterial infection that causes lesions and defoliation.",
-        "symptoms": "Water-soaked lesions that turn brown and crack, oozing bacterial exudate.",
-        "treatment": "Prune infected branches. Apply copper-based bactericides.",
-        "prevention": "Disinfect pruning tools. Avoid wounding trees.",
-        "severity": "Medium-High"
+        "description": "Nhiễm khuẩn gây tổn thương và rụng lá.",
+        "symptoms": "Tổn thương ướt nước chuyển nâu và nứt, chảy dịch vi khuẩn.",
+        "treatment": "Cắt tỉa cành bị nhiễm bệnh. Sử dụng thuốc diệt khuẩn gốc đồng.",
+        "prevention": "Khử trùng dụng cụ cắt tỉa. Tránh gây vết thương cho cây.",
+        "severity": "Trung bình-Cao"
     },
     "Cutting Weevil": {
         "emoji": "🐛",
-        "description": "Insect damage leading to irregular cuts on leaves.",
-        "symptoms": "Notched leaf edges caused by adult weevils feeding.",
-        "treatment": "Use insecticides or biological controls like nematodes.",
-        "prevention": "Remove leaf litter where weevils overwinter.",
-        "severity": "Medium"
+        "description": "Sâu hại dẫn đến các vết cắt không đều trên lá.",
+        "symptoms": "Rìa lá bị khía do bọ cánh cứng trưởng thành ăn.",
+        "treatment": "Sử dụng thuốc trừ sâu hoặc biện pháp kiểm soát sinh học như tuyến trùng.",
+        "prevention": "Loại bỏ lớp phủ lá nơi bọ cánh cứng trú đông.",
+        "severity": "Trung bình"
     },
     "Die Back": {
         "emoji": "🍂",
-        "description": "Drying of twigs and leaves from tip to base.",
-        "symptoms": "Twigs die back from the tip, leaves turn brown and fall.",
-        "treatment": "Prune affected branches and apply fungicides.",
-        "prevention": "Maintain tree vigor with proper nutrition.",
-        "severity": "High"
+        "description": "Khô cành và lá từ ngọn xuống gốc.",
+        "symptoms": "Cành khô từ ngọn, lá chuyển nâu và rụng.",
+        "treatment": "Cắt tỉa cành bị ảnh hưởng và sử dụng thuốc diệt nấm.",
+        "prevention": "Duy trì sức sống cây với dinh dưỡng phù hợp.",
+        "severity": "Cao"
     },
     "Gall Midge": {
         "emoji": chr(0x1FAB0),
-        "description": "Insect-caused galls leading to curling and swelling.",
-        "symptoms": "Swollen, distorted leaves with small maggots inside.",
-        "treatment": "Remove affected leaves. Use appropriate insecticides.",
-        "prevention": "Monitor for early signs of infestation.",
-        "severity": "Medium"
+        "description": "Sâu hại gây u bướu dẫn đến cong queo và sưng phồng.",
+        "symptoms": "Lá sưng, biến dạng với ấu trùng nhỏ bên trong.",
+        "treatment": "Loại bỏ lá bị ảnh hưởng. Sử dụng thuốc trừ sâu phù hợp.",
+        "prevention": "Theo dõi các dấu hiệu xâm nhiễm sớm.",
+        "severity": "Trung bình"
     },
     "Healthy": {
         "emoji": "✅",
-        "description": "Leaf with no visible disease.",
-        "symptoms": "Normal green color, uniform shape, no spots or deformities.",
-        "treatment": "Maintain good cultural practices to prevent diseases.",
-        "prevention": "Regular inspection and proper care.",
-        "severity": "None"
+        "description": "Lá không có dấu hiệu bệnh.",
+        "symptoms": "Màu xanh bình thường, hình dạng đồng đều, không có đốm hoặc biến dạng.",
+        "treatment": "Duy trì các biện pháp canh tác tốt để ngăn ngừa bệnh.",
+        "prevention": "Kiểm tra thường xuyên và chăm sóc đúng cách.",
+        "severity": "Không"
     },
     "Powdery Mildew": {
         "emoji": "❄️",
-        "description": "Fungal infection with white powdery patches.",
-        "symptoms": "White powdery growth on leaves and shoots.",
-        "treatment": "Apply sulfur or potassium bicarbonate-based fungicides.",
-        "prevention": "Improve air circulation around plants.",
-        "severity": "Medium"
+        "description": "Nhiễm nấm với các mảng trắng như bột.",
+        "symptoms": "Lớp phủ màu trắng như bột trên lá và chồi.",
+        "treatment": "Sử dụng thuốc diệt nấm gốc lưu huỳnh hoặc kali bicacbonat.",
+        "prevention": "Cải thiện lưu thông không khí xung quanh cây.",
+        "severity": "Trung bình"
     },
     "Sooty Mould": {
         "emoji": "🖤",
-        "description": "Black fungal growth usually due to sap-sucking insects.",
-        "symptoms": "Black, sooty coating on leaves that rubs off.",
-        "treatment": "Control honeydew-producing insects. Wash leaves with mild soap solution.",
-        "prevention": "Manage aphids, scales, and other sap-sucking pests.",
-        "severity": "Low-Medium"
+        "description": "Nấm mốc đen thường do côn trùng hút nhựa.",
+        "symptoms": "Lớp phủ màu đen, bồ hóng trên lá có thể lau sạch.",
+        "treatment": "Kiểm soát côn trùng tiết mật ngọt. Rửa lá bằng dung dịch xà phòng nhẹ.",
+        "prevention": "Quản lý rệp, vảy và các loài gây hại hút nhựa khác.",
+        "severity": "Thấp-Trung bình"
     }
 }
 
@@ -546,72 +547,73 @@ def image_to_base64(image):
 
 
 def generate_report(disease_name, confidence, disease_info):
-    """Generate a text report for download"""
+    """Tạo báo cáo văn bản để tải về"""
     return f"""
-    🍃 MANGO LEAF DISEASE ANALYSIS REPORT 🍃
+    🍃 BÁO CÁO PHÂN TÍCH BỆNH TRÊN LÁ XOÀI 🍃
     ======================================
 
-    Diagnosis: {disease_name} ({confidence:.2f}% confidence)
-    Severity: {disease_info['severity']}
+    Chẩn đoán: {disease_name} (Độ tin cậy: {confidence:.2f}%)
+    Mức độ nghiêm trọng: {disease_info['severity']}
 
-    DESCRIPTION:
+    MÔ TẢ:
     {disease_info['description']}
 
-    SYMPTOMS:
+    TRIỆU CHỨNG:
     {disease_info['symptoms']}
 
-    RECOMMENDED TREATMENT:
+    ĐIỀU TRỊ KHUYẾN NGHỊ:
     {disease_info['treatment']}
 
-    PREVENTION METHODS:
+    PHƯƠNG PHÁP PHÒNG NGỪA:
     {disease_info['prevention']}
 
-    Generated by MangoLeaf AI
+    Được tạo bởi MangoLeaf AI
     {time.strftime("%Y-%m-%d %H:%M:%S")}
     """
 
 
+
 def main():
-    # Custom header with HTML
+    # Tiêu đề tuỳ chỉnh với HTML
     st.markdown("""
     <div class="header pulse">
-        <span style="vertical-align: middle;">🍃</span> MangoLeaf AI Disease Classifier
+        <span style="vertical-align: middle;">🍃</span> Phân loại bệnh lá xoài - MangoLeaf AI
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <p style="font-size: 1.2rem; color: #4a8d65; margin-bottom: 2rem; text-align: center;">
-        Leveraging deep learning to accurately identify and diagnose mango leaf diseases. 
-        Upload an image below to get instant analysis and treatment recommendations.
+        Ứng dụng học sâu để nhận diện và chẩn đoán chính xác các bệnh trên lá xoài. 
+        Tải ảnh lên bên dưới để nhận phân tích và khuyến nghị điều trị ngay lập tức.
     </p>
     """, unsafe_allow_html=True)
 
-    # Sidebar with enhanced features
+    # Thanh bên với các tính năng nâng cao
     with st.sidebar:
-        # Logo and title
+        # Logo và tiêu đề
         st.markdown("""
         <div class="sidebar-header">
             <h2>🍃 MangoLeaf AI</h2>
-            <p>Advanced Disease Detection System</p>
+            <p>Hệ thống phát hiện bệnh tiên tiến</p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Navigation menu
-        st.markdown("### Navigation")
-        menu = ["Home", "How It Works", "Disease Library", "About", "Contact"]
+        # Menu điều hướng
+        st.markdown("### Điều hướng")
+        menu = ["Trang chủ", "Cách hoạt động", "Thư viện bệnh", "Giới thiệu", "Liên hệ"]
         choice = st.selectbox("", menu, label_visibility="collapsed")
 
-        # Upload section in sidebar
-        st.markdown("### Upload Image")
+        # Khu vực tải ảnh lên
+        st.markdown("### Tải ảnh lên")
         uploaded_file = st.file_uploader(
-            "Choose a mango leaf image...",
+            "Chọn một ảnh lá xoài...",
             type=["jpg", "jpeg", "png"],
-            help="Upload a clear image of a mango leaf for analysis",
+            help="Tải lên ảnh rõ nét của lá xoài để phân tích",
             label_visibility="collapsed"
         )
 
-        # Disease quick reference
-        with st.expander("📚 Disease Quick Reference", expanded=True):
+        # Tham khảo nhanh các loại bệnh
+        with st.expander("📚 Tham khảo nhanh các bệnh", expanded=True):
             for disease in CLASSES:
                 emoji = DISEASE_INFO[disease]["emoji"]
                 st.markdown(f"""
@@ -625,6 +627,7 @@ def main():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
 
         # Contact information
         st.markdown("---")
@@ -679,8 +682,8 @@ def main():
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <h3 style="color: #1e6b45; margin-bottom: 0.5rem;">Upload a Mango Leaf Image</h3>
-                    <p>Supported formats: JPG, JPEG, PNG</p>
+                    <h3 style="color: #1e6b45; margin-bottom: 0.5rem;">Tải lên hình ảnh lá xoài</h3>
+                    <p>Hỗ trợ định dạng: JPG, JPEG, PNG</p>
                     <p style="margin-top: 1rem; color: #5d9c74; font-size: 0.9rem;">
                         <span class="tooltip">Tips for best results
                             <span class="tooltiptext">Use a clear, well-lit image of a single leaf against a plain background</span>
@@ -691,11 +694,11 @@ def main():
             """, unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<div class="subheader">🔍 Analysis Results</div>', unsafe_allow_html=True)
+        st.markdown('<div class="subheader">🔍 Kết quả</div>', unsafe_allow_html=True)
 
         if image_path:
             # Loading animation
-            with st.spinner("Analyzing the leaf image..."):
+            with st.spinner("Phân tích hình ảnh lá..."):
                 # Simulate processing time for better UX
                 time.sleep(1.5)
 
@@ -723,13 +726,13 @@ def main():
             st.markdown(f"""
             <div class="result-animation" style="background: white; border-radius: 15px; padding: 1.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
                 <h3 style="color: #1e6b45;">{emoji} {disease_name}</h3>
-                <p><strong style="color: #1e6b45;">📝 Description:</strong> {description}</p>
-                <p><strong style="color: #1e6b45;">{emoji} Symptoms:</strong> {symptoms}</p>
-                <p><strong style="color: #1e6b45;">Confidence:</strong> <span class="{confidence_color}">{confidence_percent:.2f}%</span></p>
+                <p><strong style="color: #1e6b45;">📝 Miêu tả:</strong> {description}</p>
+                <p><strong style="color: #1e6b45;">{emoji} Triệu chứng:</strong> {symptoms}</p>
+                <p><strong style="color: #1e6b45;">Độ tin cậy:</strong> <span class="{confidence_color}">{confidence_percent:.2f}%</span></p>
             </div>
             """, unsafe_allow_html=True)
             # Treatment card with tabs
-            tab1, tab2 = st.tabs(["💊 Treatment Recommendations", "🛡️ Prevention Strategies"])
+            tab1, tab2 = st.tabs(["💊 Khuyến nghị điều trị", "🛡️ Chiến lược phòng ngừa"])
 
             with tab1:
                 st.markdown(f"""
@@ -753,7 +756,7 @@ def main():
 
             # Download report button
             st.download_button(
-                label="📥 Download Full Analysis Report",
+                label="📥 Tải xuống Báo cáo phân tích đầy đủ",
                 data=generate_report(disease_name, confidence_percent, DISEASE_INFO[disease_name]),
                 file_name=f"mango_leaf_report_{disease_name.lower().replace(' ', '_')}.txt",
                 mime="text/plain"
@@ -772,14 +775,14 @@ def main():
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3 style="color: #1e6b45; margin-bottom: 0.8rem; font-size: 1.8rem;">Ready to Analyze</h3>
+                <h3 style="color: #1e6b45; margin-bottom: 0.8rem; font-size: 1.8rem;">Sẵn sàng để phân tích</h3>
                 <p style="font-size: 1.1rem; max-width: 400px; margin: 0 auto 1.5rem;">
-                    Upload an image of a mango leaf to get detailed analysis and recommendations
+                    Tải lên hình ảnh lá xoài để có được phân tích chi tiết và khuyến nghị
                 </p>
                 <div style="display: inline-block; background: white; padding: 0.8rem 1.5rem; 
                             border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
                             color: #2e8b57; font-weight: 600;">
-                    <span class="pulse">⬅️ Upload an image using the sidebar</span>
+                    <span class="pulse">⬅️ Tải lên hình ảnh bằng thanh bên</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -787,7 +790,7 @@ def main():
     # Footer
     st.markdown("""
     <div class="footer">
-        © 2023 MangoLeaf AI | Advanced Plant Disease Detection System
+        © 2023 MangoLeaf AI | Hệ thống phát hiện bệnh thực vật tiên tiến
     </div>
     """, unsafe_allow_html=True)
 
