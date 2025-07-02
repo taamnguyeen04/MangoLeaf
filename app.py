@@ -1,31 +1,27 @@
 import streamlit as st
 import os
-import torch
-import torch.nn as nn
-from torchvision.models import resnet34
 import numpy as np
 import cv2
 from PIL import Image
-import tempfile
 import time
 import base64
 import io
+from keras.models import load_model
 
-# Cấu hình giao diện trang với biểu tượng tùy chỉnh và bố cục rộng
+# Cấu hình giao diện trang
 st.set_page_config(
     page_title="MangoLeaf AI | Phân loại bệnh trên lá xoài",
     page_icon="🍃",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://example.com/help',  # Bạn có thể thay đổi đường link nếu muốn
+        'Get Help': 'https://example.com/help',
         'Report a bug': "https://example.com/bug",
         'About': "# MangoLeaf AI - Hệ thống phát hiện bệnh tiên tiến"
     }
 )
 
-
-# Disease information with emojis and more details
+# Thông tin bệnh
 DISEASE_INFO = {
     "Anthracnose": {
         "emoji": "🍄",
@@ -60,7 +56,7 @@ DISEASE_INFO = {
         "severity": "Cao"
     },
     "Gall Midge": {
-        "emoji": chr(0x1FAB0),
+        "emoji": "🪰",
         "description": "Sâu hại gây u bướu dẫn đến cong queo và sưng phồng.",
         "symptoms": "Lá sưng, biến dạng với ấu trùng nhỏ bên trong.",
         "treatment": "Loại bỏ lá bị ảnh hưởng. Sử dụng thuốc trừ sâu phù hợp.",
@@ -95,38 +91,41 @@ DISEASE_INFO = {
 
 CLASSES = list(DISEASE_INFO.keys())
 
-# Custom CSS with animations and advanced styling
+# CSS tùy chỉnh
 st.markdown("""
 <style>
     /* Import Google Font */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
     /* Global styles */
     * {
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Inter', sans-serif;
         transition: all 0.3s ease;
     }
 
+    body {
+        background-color: #f8fbf8;
+    }
+
     /* Main container styling */
-    .main {
+    .stApp {
         background: linear-gradient(135deg, #f8fbf9 0%, #e6f3ec 100%);
         padding: 0 2rem;
     }
 
-    /* Header styling with animation */
+    /* Header styling */
     .header {
         font-size: 2.8rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #1e6b45 0%, #2e8b57 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        color: #1e6b45;
         margin-bottom: 1.5rem;
-        animation: fadeIn 1.2s ease-in-out;
         text-align: center;
         padding: 1rem 0;
         position: relative;
         letter-spacing: -0.5px;
+        background: linear-gradient(90deg, #1e6b45 0%, #2e8b57 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
     .header:after {
@@ -163,38 +162,20 @@ st.markdown("""
         border-radius: 2px;
     }
 
-    /* Card styling with hover effects */
+    /* Card styling */
     .disease-card {
-        border-radius: 15px;
+        border-radius: 12px;
         padding: 1.8rem;
         margin-bottom: 1.8rem;
         background: white;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-        transition: all 0.4s ease;
-        border-left: 6px solid #2e8b57;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .disease-card:before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 5px;
-        background: linear-gradient(90deg, #2e8b57 0%, #3cb371 100%);
-        transform: translateY(-100%);
-        transition: transform 0.4s ease;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        border-left: 4px solid #2e8b57;
     }
 
     .disease-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
-    }
-
-    .disease-card:hover:before {
-        transform: translateY(0);
+        transform: translateY(-5px);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.1);
     }
 
     /* Confidence indicators */
@@ -225,73 +206,30 @@ st.markdown("""
         display: inline-block;
     }
 
-    /* Progress bar customization */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #2e8b57 0%, #3cb371 100%);
-        border-radius: 6px;
-        height: 12px;
-    }
-
     /* Button styling */
     .stButton>button {
         border: none;
         background: linear-gradient(90deg, #1e6b45 0%, #2e8b57 100%);
         color: white;
         padding: 0.7rem 1.8rem;
-        border-radius: 10px;
+        border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(30, 107, 69, 0.3);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .stButton>button:before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-        transition: all 0.6s;
+        box-shadow: 0 4px 12px rgba(30, 107, 69, 0.2);
     }
 
     .stButton>button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(30, 107, 69, 0.5);
-    }
-
-    .stButton>button:hover:before {
-        left: 100%;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(30, 107, 69, 0.3);
+        background: linear-gradient(90deg, #2e8b57 0%, #3cb371 100%);
     }
 
     /* File uploader styling */
     .stFileUploader>div>div>div>div {
         border: 2px dashed #2e8b57;
-        border-radius: 15px;
+        border-radius: 12px;
         background: rgba(46, 139, 87, 0.05);
         padding: 2rem 1rem;
-    }
-
-    /* Animation for results */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-        100% { transform: scale(1); }
-    }
-
-    .result-animation {
-        animation: fadeIn 0.8s ease-out;
-    }
-
-    .pulse {
-        animation: pulse 2s infinite;
     }
 
     /* Severity badges */
@@ -302,7 +240,6 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: 600;
-        box-shadow: 0 3px 10px rgba(255, 107, 107, 0.3);
     }
 
     .severity-medium {
@@ -312,7 +249,6 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: 600;
-        box-shadow: 0 3px 10px rgba(255, 209, 102, 0.3);
     }
 
     .severity-low {
@@ -322,7 +258,6 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: 600;
-        box-shadow: 0 3px 10px rgba(6, 214, 160, 0.3);
     }
 
     /* Tooltip styling */
@@ -348,20 +283,8 @@ st.markdown("""
         margin-left: -110px;
         opacity: 0;
         transition: opacity 0.3s;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         font-size: 0.9rem;
         font-weight: 400;
-    }
-
-    .tooltip .tooltiptext::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #1e6b45 transparent transparent transparent;
     }
 
     .tooltip:hover .tooltiptext {
@@ -371,28 +294,23 @@ st.markdown("""
 
     /* Image preview styling */
     .image-preview {
-        border-radius: 15px;
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        transition: all 0.4s ease;
-        border: 3px solid #fff;
-    }
-
-    .image-preview:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        border: 2px solid #fff;
     }
 
     /* Sidebar styling */
     .sidebar .sidebar-content {
         background: linear-gradient(180deg, #f8fbf9 0%, #e6f3ec 100%);
-        box-shadow: 5px 0 15px rgba(0,0,0,0.05);
+        box-shadow: 5px 0 15px rgba(0,0,0,0.03);
     }
 
     .sidebar-header {
         text-align: center;
         padding: 1.5rem 0;
-        border-bottom: 1px solid rgba(46, 139, 87, 0.2);
+        border-bottom: 1px solid rgba(46, 139, 87, 0.1);
         margin-bottom: 1.5rem;
     }
 
@@ -403,23 +321,18 @@ st.markdown("""
         font-weight: 700;
     }
 
-    .sidebar-header p {
-        color: #4a8d65;
-        font-size: 0.9rem;
-    }
-
     .disease-ref {
         background: white;
-        border-radius: 12px;
+        border-radius: 10px;
         padding: 1rem;
         margin-bottom: 1rem;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        transition: all 0.3s ease;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.03);
+        transition: all 0.2s ease;
     }
 
     .disease-ref:hover {
-        transform: translateX(5px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+        transform: translateX(3px);
+        box-shadow: 0 5px 12px rgba(0,0,0,0.05);
     }
 
     /* Footer styling */
@@ -427,9 +340,18 @@ st.markdown("""
         text-align: center;
         padding: 1.5rem 0;
         margin-top: 2rem;
-        border-top: 1px solid rgba(46, 139, 87, 0.2);
+        border-top: 1px solid rgba(46, 139, 87, 0.1);
         color: #4a8d65;
         font-size: 0.9rem;
+    }
+
+    /* Result container */
+    .result-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.8rem;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
     }
 
     /* Responsive adjustments */
@@ -441,102 +363,75 @@ st.markdown("""
         .subheader {
             font-size: 1.4rem;
         }
+    }
 
-        .disease-card {
-            padding: 1.2rem;
-        }
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: #f0f9f4 !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        margin: 0 5px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(90deg, #1e6b45 0%, #2e8b57 100%) !important;
+        color: white !important;
+        font-weight: 600 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# JavaScript for additional interactivity
-st.markdown("""
-<script>
-    // Add smooth scrolling to all links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            document.querySelector(this.getAttribute('href')).scrollIntoView({
-                behavior: 'smooth'
-            });
-        });
-    });
 
-    // Add animation when elements come into view
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('animate');
-            }
-        });
-    }, {threshold: 0.1});
-
-    document.querySelectorAll('.animate-on-scroll').forEach(el => {
-        observer.observe(el);
-    });
-
-    // Add pulse animation to important elements
-    setInterval(() => {
-        const pulseElements = document.querySelectorAll('.pulse');
-        pulseElements.forEach(el => {
-            el.classList.remove('pulse');
-            void el.offsetWidth; // Trigger reflow
-            el.classList.add('pulse');
-        });
-    }, 4000);
-</script>
-""", unsafe_allow_html=True)
-
-
-@st.cache_resource
-def load_model(checkpoint_path="trained_models/leaf"):
-    """Load the trained model"""
-    model = resnet34()
-    model.fc = nn.Linear(in_features=512, out_features=8)
-    checkpoint = torch.load(os.path.join(checkpoint_path, "best.pt"))
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.eval()
+@st.cache(allow_output_mutation=True)
+def load_model_keras():
+    """Load the trained Keras model"""
+    model = load_model("keras_Model.h5", compile=False)
     return model
 
 
+@st.cache(allow_output_mutation=True)
+def load_class_names():
+    with open("labels.txt", "r") as f:
+        class_names = [line.strip().split(' ', 1)[-1] for line in f.readlines()]
+    return class_names
+
+
 def preprocess_image(image, image_size=224):
-    """Preprocess the uploaded image"""
+    """Preprocess the uploaded image for Keras model"""
     image = np.array(image)
 
-    if len(image.shape) == 2:
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-    else:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     image = cv2.resize(image, (image_size, image_size))
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    image = image / 255.
-    image = (image - mean) / std
-    image = np.transpose(image, (2, 0, 1))[None, :, :, :]
-    image = torch.from_numpy(image).float()
+    image = image.astype(np.float32)
+    image = (image / 127.5) - 1
+    image = np.expand_dims(image, axis=0)
     return image
 
 
-def predict(image, model, device):
-    """Make prediction on the image"""
-    softmax = nn.Softmax(dim=1)
-    with torch.no_grad():
-        output = model(image.to(device))
-        prob = softmax(output)
-        predicted_prob, predicted_class = torch.max(prob, dim=1)
-    return predicted_prob[0], predicted_class[0]
+def predict(image, model):
+    predictions = model.predict(image)
+    index = np.argmax(predictions[0])
+    confidence = predictions[0][index]
+    all_probs = predictions[0]
+    return confidence, index, all_probs
 
 
 def severity_badge(severity):
     """Return styled severity badge"""
     severity = severity.lower()
-    if "high" in severity:
-        return f'<span class="severity-high">{severity.upper()}</span>'
-    elif "medium" in severity:
-        return f'<span class="severity-medium">{severity.upper()}</span>'
+    if "cao" in severity:
+        return f'<span class="severity-high">MỨC ĐỘ CAO</span>'
+    elif "trung bình" in severity:
+        return f'<span class="severity-medium">MỨC ĐỘ TRUNG BÌNH</span>'
     else:
-        return f'<span class="severity-low">{severity.upper()}</span>'
+        return f'<span class="severity-low">MỨC ĐỘ THẤP</span>'
 
 
 def image_to_base64(image):
@@ -572,23 +467,22 @@ def generate_report(disease_name, confidence, disease_info):
     """
 
 
-
 def main():
-    # Tiêu đề tuỳ chỉnh với HTML
+    # Tiêu đề ứng dụng
     st.markdown("""
-    <div class="header pulse">
-        <span style="vertical-align: middle;">🍃</span> Phân loại bệnh lá xoài - MangoLeaf AI
+    <div class="header">
+        🍃 Phân loại bệnh lá xoài - MangoLeaf AI
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <p style="font-size: 1.2rem; color: #4a8d65; margin-bottom: 2rem; text-align: center;">
+    <p style="font-size: 1.1rem; color: #4a8d65; margin-bottom: 2rem; text-align: center;">
         Ứng dụng học sâu để nhận diện và chẩn đoán chính xác các bệnh trên lá xoài. 
         Tải ảnh lên bên dưới để nhận phân tích và khuyến nghị điều trị ngay lập tức.
     </p>
     """, unsafe_allow_html=True)
 
-    # Thanh bên với các tính năng nâng cao
+    # Thanh bên
     with st.sidebar:
         # Logo và tiêu đề
         st.markdown("""
@@ -603,14 +497,24 @@ def main():
         menu = ["Trang chủ", "Cách hoạt động", "Thư viện bệnh", "Giới thiệu", "Liên hệ"]
         choice = st.selectbox("", menu, label_visibility="collapsed")
 
-        # Khu vực tải ảnh lên
-        st.markdown("### Tải ảnh lên")
-        uploaded_file = st.file_uploader(
-            "Chọn một ảnh lá xoài...",
-            type=["jpg", "jpeg", "png"],
-            help="Tải lên ảnh rõ nét của lá xoài để phân tích",
+        st.markdown("### Chọn phương thức nhập ảnh")
+        input_method = st.radio(
+            "",
+            ["Tải ảnh lên", "Chụp ảnh bằng camera"],
             label_visibility="collapsed"
         )
+
+        if input_method == "Tải ảnh lên":
+            uploaded_file = st.file_uploader(
+                "Chọn một ảnh lá xoài...",
+                type=["jpg", "jpeg", "png"],
+                help="Tải lên ảnh rõ nét của lá xoài để phân tích",
+                label_visibility="collapsed"
+            )
+            camera_file = None
+        else:
+            camera_file = st.camera_input("Chụp ảnh lá xoài...", label_visibility="collapsed")
+            uploaded_file = None
 
         # Tham khảo nhanh các loại bệnh
         with st.expander("📚 Tham khảo nhanh các bệnh", expanded=True):
@@ -628,50 +532,55 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
 
-
-        # Contact information
+        # Thông tin liên hệ
         st.markdown("---")
         st.markdown("""
         <div style="text-align: center; font-size: 0.9rem; color: #4a8d65; padding: 1rem 0;">
-            <p style="margin-bottom: 0.8rem; font-weight: 600;">Need help? Contact our support team</p>
+            <p style="margin-bottom: 0.8rem; font-weight: 600;">Cần hỗ trợ? Liên hệ đội ngũ của chúng tôi</p>
             <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1rem;">
                 <div style="background: white; border-radius: 10px; padding: 0.7rem; box-shadow: 0 3px 10px rgba(0,0,0,0.05);">
                     <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✉️</div>
-                    <div>support@mangoleaf.ai</div>
+                    <div>quangminhvt1701@gmail.com</div>
                 </div>
                 <div style="background: white; border-radius: 10px; padding: 0.7rem; box-shadow: 0 3px 10px rgba(0,0,0,0.05);">
                     <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📞</div>
-                    <div>+1 (555) 123-4567</div>
+                    <div>0933100017</div>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    # Main content columns
+    # Cột nội dung chính
     col1, col2 = st.columns([1, 1], gap="large")
 
     with col1:
-        st.markdown('<div class="subheader">📤 Image Upload & Preview</div>', unsafe_allow_html=True)
+        st.markdown('<div class="subheader">📤 Nhập ảnh</div>', unsafe_allow_html=True)
 
-        if uploaded_file is not None:
-            # Display uploaded image with fancy border
-            image = Image.open(uploaded_file)
+        input_image = None
+        if camera_file is not None:
+            input_image = Image.open(camera_file)
+            source_type = "Camera"
+        elif uploaded_file is not None:
+            input_image = Image.open(uploaded_file)
+            source_type = "Tải lên"
+        else:
+            source_type = None
+
+        if input_image:
+            # Hiển thị ảnh
             st.markdown(f"""
             <div class="image-preview">
-                <img src="data:image/png;base64,{image_to_base64(image)}" style="width: 100%;"/>
+                <img src="data:image/png;base64,{image_to_base64(input_image)}" style="width: 100%;"/>
+            </div>
+            <div style="text-align: center; margin-top: 1rem; color: #4a8d65; font-weight: 500;">
+                Ảnh được chụp từ: {source_type}
             </div>
             """, unsafe_allow_html=True)
-
-            # Save to temp file for processing
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                image.save(tmp_file.name)
-                image_path = tmp_file.name
         else:
-            image_path = None
-            # Placeholder with animation
+            # Placeholder khi chưa có ảnh
             st.markdown("""
             <div style="background: linear-gradient(135deg, #f0f9f4 0%, #e1f3e9 100%); 
-                        border: 2px dashed #2e8b57; border-radius: 15px; 
+                        border: 2px dashed #2e8b57; border-radius: 12px; 
                         height: 350px; display: flex; justify-content: center; align-items: center;
                         margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
                 <div style="text-align: center; color: #4a8d65;">
@@ -685,8 +594,8 @@ def main():
                     <h3 style="color: #1e6b45; margin-bottom: 0.5rem;">Tải lên hình ảnh lá xoài</h3>
                     <p>Hỗ trợ định dạng: JPG, JPEG, PNG</p>
                     <p style="margin-top: 1rem; color: #5d9c74; font-size: 0.9rem;">
-                        <span class="tooltip">Tips for best results
-                            <span class="tooltiptext">Use a clear, well-lit image of a single leaf against a plain background</span>
+                        <span class="tooltip">Mẹo cho kết quả tốt nhất
+                            <span class="tooltiptext">Sử dụng ảnh rõ nét, chụp lá trên nền trơn</span>
                         </span>
                     </p>
                 </div>
@@ -694,50 +603,68 @@ def main():
             """, unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<div class="subheader">🔍 Kết quả</div>', unsafe_allow_html=True)
+        st.markdown('<div class="subheader">🔍 Kết quả phân tích</div>', unsafe_allow_html=True)
 
-        if image_path:
+        if input_image:
             # Loading animation
-            with st.spinner("Phân tích hình ảnh lá..."):
-                # Simulate processing time for better UX
-                time.sleep(1.5)
+            with st.spinner("Đang phân tích hình ảnh..."):
+                # Load model và tên lớp
+                model = load_model_keras()
+                class_names = load_class_names()
 
-                # Load model and make prediction
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                model = load_model().to(device)
-                processed_image = preprocess_image(image)
-                confidence, class_idx = predict(processed_image, model, device)
+                # Tiền xử lý và dự đoán
+                processed_image = preprocess_image(input_image)
+                confidence, class_idx, all_probs = predict(processed_image, model)
                 confidence_percent = confidence * 100
-                disease_name = CLASSES[class_idx]
+                disease_name = class_names[class_idx]
 
-                # Get all predictions for the radar chart
-                with torch.no_grad():
-                    output = model(processed_image.to(device))
-                    softmax = nn.Softmax(dim=1)
-                    all_probs = softmax(output)[0].cpu().numpy()
+                # Lấy thông tin bệnh
+                disease_info = DISEASE_INFO.get(disease_name, {
+                    "emoji": "❓",
+                    "description": "Không có thông tin chi tiết",
+                    "symptoms": "Không có thông tin chi tiết",
+                    "treatment": "Không có thông tin chi tiết",
+                    "prevention": "Không có thông tin chi tiết",
+                    "severity": "Không xác định"
+                })
 
-            # Results container with animation class
+            # Hiển thị kết quả
             emoji = DISEASE_INFO[disease_name]["emoji"]
             description = DISEASE_INFO[disease_name]["description"]
             symptoms = DISEASE_INFO[disease_name]["symptoms"]
             confidence_color = "confidence-high" if confidence_percent > 85 else (
                 "confidence-medium" if confidence_percent > 60 else "confidence-low")
 
-            st.markdown(f"""
-            <div class="result-animation" style="background: white; border-radius: 15px; padding: 1.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
-                <h3 style="color: #1e6b45;">{emoji} {disease_name}</h3>
-                <p><strong style="color: #1e6b45;">📝 Miêu tả:</strong> {description}</p>
-                <p><strong style="color: #1e6b45;">{emoji} Triệu chứng:</strong> {symptoms}</p>
-                <p><strong style="color: #1e6b45;">Độ tin cậy:</strong> <span class="{confidence_color}">{confidence_percent:.2f}%</span></p>
-            </div>
-            """, unsafe_allow_html=True)
-            # Treatment card with tabs
+            with st.container():
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 1.5rem;">
+                    <span style="font-size: 2.5rem; margin-right: 15px;">{emoji}</span>
+                    <div>
+                        <h3 style="color: #1e6b45; margin: 0;">{disease_name}</h3>
+                        <p style="margin: 0; color: #666; font-size: 1rem;">{severity_badge(disease_info['severity'])}</p>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <p><strong style="color: #1e6b45;">📝 Mô tả:</strong> {description}</p>
+                    <p><strong style="color: #1e6b45;">🩺 Triệu chứng:</strong> {symptoms}</p>
+                    <p><strong style="color: #1e6b45;">📊 Độ tin cậy:</strong> <span class="{confidence_color}">{confidence_percent:.2f}%</span></p>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <p><strong style="color: #1e6b45;">📈 Xác suất các bệnh:</strong></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.progress(int(confidence_percent))
+
+            # Tab điều trị và phòng ngừa
             tab1, tab2 = st.tabs(["💊 Khuyến nghị điều trị", "🛡️ Chiến lược phòng ngừa"])
 
             with tab1:
                 st.markdown(f"""
                 <div class="disease-card">
-                    <h4 style="margin-top: 0; color: #1e6b45; border-bottom: 1px solid #eee; padding-bottom: 0.8rem;">Treatment Recommendations</h4>
+                    <h4 style="margin-top: 0; color: #1e6b45;">Phương pháp điều trị</h4>
                     <p style="font-size: 1.05rem; line-height: 1.6;">{DISEASE_INFO[disease_name]["treatment"]}</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -745,27 +672,23 @@ def main():
             with tab2:
                 st.markdown(f"""
                 <div class="disease-card">
-                    <h4 style="margin-top: 0; color: #1e6b45; border-bottom: 1px solid #eee; padding-bottom: 0.8rem;">Prevention Strategies</h4>
+                    <h4 style="margin-top: 0; color: #1e6b45;">Biện pháp phòng ngừa</h4>
                     <p style="font-size: 1.05rem; line-height: 1.6;">{DISEASE_INFO[disease_name]["prevention"]}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # All predictions radar chart (simplified)
-            st.markdown("### Disease Probability Distribution")
-            st.bar_chart({cls: float(prob * 100) for cls, prob in zip(CLASSES, all_probs)})
-
-            # Download report button
+            # Nút tải báo cáo
             st.download_button(
                 label="📥 Tải xuống Báo cáo phân tích đầy đủ",
                 data=generate_report(disease_name, confidence_percent, DISEASE_INFO[disease_name]),
-                file_name=f"mango_leaf_report_{disease_name.lower().replace(' ', '_')}.txt",
+                file_name=f"bao_cao_{disease_name.lower().replace(' ', '_')}.txt",
                 mime="text/plain"
             )
         else:
-            # Results placeholder
+            # Placeholder khi chưa có ảnh
             st.markdown("""
             <div style="background: linear-gradient(135deg, #f0f9f4 0%, #e1f3e9 100%); 
-                        border-radius: 15px; padding: 2.5rem; text-align: center; color: #4a8d65;
+                        border-radius: 12px; padding: 2.5rem; text-align: center; color: #4a8d65;
                         box-shadow: 0 8px 20px rgba(0,0,0,0.05); height: 500px; display: flex; 
                         flex-direction: column; justify-content: center;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 24 24" 
@@ -782,7 +705,7 @@ def main():
                 <div style="display: inline-block; background: white; padding: 0.8rem 1.5rem; 
                             border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
                             color: #2e8b57; font-weight: 600;">
-                    <span class="pulse">⬅️ Tải lên hình ảnh bằng thanh bên</span>
+                    ⬅️ Tải lên hình ảnh bằng thanh bên
                 </div>
             </div>
             """, unsafe_allow_html=True)

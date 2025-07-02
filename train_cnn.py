@@ -156,8 +156,6 @@ def train(args):
                 best_acc = accuracy
 
 
-
-
 if __name__ == '__main__':
     args = get_args()
     train(args)
