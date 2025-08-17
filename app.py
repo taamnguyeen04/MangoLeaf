@@ -21,7 +21,7 @@ st.set_page_config(
     }
 )
 
-# Thông tin bệnh
+# Thông tin bệnhs
 DISEASE_INFO = {
     "Anthracnose": {
         "emoji": "🍄",
@@ -713,7 +713,7 @@ def main():
     # Footer
     st.markdown("""
     <div class="footer">
-        © 2023 MangoLeaf AI | Hệ thống phát hiện bệnh thực vật tiên tiến
+        © 2025 MangoLeaf AI | Hệ thống phát hiện bệnh thực vật tiên tiến
     </div>
     """, unsafe_allow_html=True)
 

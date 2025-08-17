@@ -1,5 +1,4 @@
 import os.path
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -26,7 +25,7 @@ def get_args():
     parser.add_argument("--epochs", "-e", type=int, default=100)
     parser.add_argument("--lr", "-l", type=float, default=1e-2)
     parser.add_argument("--log_path", "-p", type=str, default="tensorboard/leaf")
-    parser.add_argument("--checkpoint_path", "-c", type=str, default="trained_models/leaf")
+    parser.add_argument("--checkpoint_path", "-c", type=str, default="trained_models/leaff")
     args = parser.parse_args()
 
     return args
@@ -74,7 +73,7 @@ def train(args):
     model = resnet34(weights=ResNet34_Weights.DEFAULT)
     model.fc = nn.Linear(in_features=512, out_features=8)
 
-    model.to(device)  # ~in-place function
+    model.to(device)
     transform = Compose([
         Resize((args.image_size, args.image_size)),
         ToTensor(),
@@ -96,7 +95,6 @@ def train(args):
         shuffle=False,
         drop_last=False
     )
-    # criterion = nn.CrossEntropyLoss(weight=torch.Tensor([1, 2, 1, 1, 2, 1, 1, 1, 1, 1]).to(device))
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
     if os.path.isdir(args.log_path):
@@ -107,8 +105,8 @@ def train(args):
 
     writer = SummaryWriter(args.log_path)
     best_acc = -100
+    # bắt đầu huấn luyện
     for epoch in range(args.epochs):
-        # TRAIN
         model.train()
         progress_bar = tqdm(train_dataloader, colour="BLUE")
         for i, (images, labels) in enumerate(progress_bar):
@@ -127,12 +125,11 @@ def train(args):
         all_losses = []
         all_labels = []
         all_predictions = []
-        with torch.no_grad():  # equivalent to # with torch.inference_mode():
+        with torch.no_grad():
             for i, (images, labels) in enumerate(test_dataloader):
                 images = images.to(device)
                 labels = labels.to(device)
                 output = model(images)
-                # _, predictions = torch.max(output, dim=1)
                 predictions = torch.argmax(output, dim=1)
                 loss = criterion(output, labels)
                 all_losses.append(loss.item())
